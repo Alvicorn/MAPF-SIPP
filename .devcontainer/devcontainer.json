@@ -1,0 +1,17 @@
+{
+    "name": "MAPF Devcontainer",
+    "dockerFile": "Dockerfile",
+    "context": ".",
+    "customizations": {
+        "vscode": {
+            "settings": {},
+            "extensions": [
+                "streetsidesoftware.code-spell-checker",
+                "aaron-bond.better-comments",
+                "njpwerner.autodocstring",
+                "ms-python.python"
+            ]
+        }
+    },
+    "postCreateCommand": "pre-commit install && pre-commit autoupdate"
+}

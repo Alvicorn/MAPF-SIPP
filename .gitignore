@@ -1,0 +1,8 @@
+# auto generated files to ignore
+.coverage
+.hypothesis
+.pytest_cache
+.ruff_cache
+.vscode
+__pycache__/
+results.csv
