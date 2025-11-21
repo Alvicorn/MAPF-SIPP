@@ -1,8 +1,10 @@
-.PHONY: test_static_experiments_standard test_static_experiments_disjoint
+.PHONY: test_all test_static_experiments_standard test_static_experiments_disjoint
 
 
 STATIC_TEST_PATH = instances/static/tests
 
+test_all:
+	pytest tests
 
 test_static_experiments_standard:
 	python run_static_experiments.py \
