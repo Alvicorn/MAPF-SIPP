@@ -1,7 +1,6 @@
 {
-    "name": "MAPF Devcontainer",
-    "dockerFile": "Dockerfile",
-    "context": ".",
+    "name": "MAPF-SIPP Devcontainer",
+    "image": "alvicorn/mapf-sipp:latest",
     "customizations": {
         "vscode": {
             "settings": {},

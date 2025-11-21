@@ -1,4 +1,5 @@
 # Base image for MAPF-SIPP project .
+
 FROM python:3.14-slim
 
 # Set environment variables to avoid .pyc files and ensure logs flush immediately
@@ -17,10 +18,10 @@ RUN apt-get update -y \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir --break-system-packages \
-        #   "pre-commit<2.21" \
           pre-commit \
           numpy \
-          matplotlib
+          matplotlib \
+          pytest
 
 # Verify Python version
 RUN python3 --version
