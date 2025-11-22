@@ -1,0 +1,23 @@
+[[dynamic_obstacle]]
+id = "a"
+type = "deterministic"
+start_t = 4
+hide_before_start = true
+disappear_after_end = true
+trajectory = ["D", "D", "D"]
+
+[[dynamic_obstacle]]
+id = "b"
+type = "deterministic"
+start_t = 0
+hide_before_start = false
+disappear_after_end = false
+trajectory = ["D", "D", "D", "D", "D", "W", "L", "U", "U", "U", "U", "U"]
+
+[[dynamic_obstacle]]
+id = "cc"
+type = "deterministic"
+start_t = 2
+hide_before_start = false
+disappear_after_end = true
+trajectory = ["L", "L", "W", "D", "D", "W", "R", "R", "W", "U", "U"]
