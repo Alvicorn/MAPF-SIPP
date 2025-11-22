@@ -1,10 +1,13 @@
-.PHONY: test_all test_static_experiments_standard test_static_experiments_disjoint
+.PHONY: test_all unit_test test_static_experiments_standard test_static_experiments_disjoint
 
 
 STATIC_TEST_PATH = instances/static/tests
 
 test_all:
-	pytest tests
+	pytest -n 3 tests
+
+unit_test:
+	pytest --cov=. --cov-report term-missing tests/unit
 
 test_static_experiments_standard:
 	python run_static_experiments.py \
