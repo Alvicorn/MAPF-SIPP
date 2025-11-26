@@ -9,7 +9,7 @@ from cbs_sipp.cbs.cbs import CBSSolver
 from cbs_sipp.map.grid_map import GridMap
 from cbs_sipp.path_utils import get_sum_of_cost
 
-INSTANCES_PATH = "instances/static/tests"
+INSTANCES_PATH = "instances/tests"
 INSTANCES = "test_*"
 RESULTS = "min-sum-of-cost.csv"
 
