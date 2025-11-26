@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List
 
+from cbs_sipp.map.grid_map import GridMap
+
 
 @dataclass(frozen=True, slots=True)
 class Point:
@@ -43,13 +45,15 @@ class DynamicObstacle:
         self.trajectories.append(trajectory)
 
 
-def import_dynamic_env_instance(file: str) -> Dict[str, DynamicObstacle]:
+def import_dynamic_env_instance(
+    file: str, grid_map: GridMap
+) -> Dict[str, DynamicObstacle]:
     """
     Import the dynamic instance data from a TOML file.
 
     Args:
         file (str): TOML file with MAPF dynamic environment instance data.
-
+        grid_map (GridMap): Map of the static environment (e.g. barriers).
     Returns:
         Dict[str, DynamicObstacle]: Map between dynamic obstacle names and its data.
     """
@@ -80,6 +84,11 @@ def import_dynamic_env_instance(file: str) -> Dict[str, DynamicObstacle]:
         x_start = _get_obstacle_data_int(start_point, "x", i)
         y_start = _get_obstacle_data_int(start_point, "y", i)
 
+        if not grid_map.is_free((x_start, y_start)):
+            raise ValueError(
+                f"Initial start location for obstacle {id} is impeded by a static barrier"
+            )
+
         obstacle = DynamicObstacle(id)
 
         for trajectory in _get_obstacle_data_list(data, "trajectories", i):
@@ -87,6 +96,11 @@ def import_dynamic_env_instance(file: str) -> Dict[str, DynamicObstacle]:
             for point in _get_obstacle_data_list(trajectory, "points", i):
                 x = _get_obstacle_data_int(point, "x", i)
                 y = _get_obstacle_data_int(point, "y", i)
+                if not grid_map.is_free((x, y)):
+                    raise ValueError(
+                        f"Initial start location for obstacle {id} is impeded by a static barrier"
+                    )
+
                 t = _get_obstacle_data_int(point, "t", i)
                 p = _get_obstacle_data_float(point, "p", i)
                 points.append(Point(x, y, t, p))

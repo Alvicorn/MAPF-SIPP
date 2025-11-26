@@ -13,6 +13,11 @@ DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 class GridMap:
     map: List[List[bool]]
 
+    def is_free(self, loc: Vertex) -> bool:
+        if loc[0] < 0 or loc[1] < 0:
+            return True  # out of bounds is a barrier
+        return not self.map[loc[0]][loc[1]]
+
     def get_neighbours(self, curr_loc: Vertex) -> List[Vertex]:
         x, y = curr_loc
         w = len(self.map)
