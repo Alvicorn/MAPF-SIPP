@@ -1,333 +1,233 @@
 import io
 import re
 from pathlib import Path
-from typing import Set
-from unittest.mock import MagicMock, mock_open, patch
+from string import Template
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from cbs_sipp.map.dynamic_env import (
-    DeterministicMovement,
+    DynamicObstacle,
+    Point,
+    Trajectory,
     import_dynamic_env_instance,
-    import_dynamic_env_map,
 )
-from cbs_sipp.map.dynamic_env import TrajectoryMovement as M
 
-MAP_INSTANCES_PATH = "instances/dynamic/maps"
-INSTANCES_PATH = "instances/dynamic/custom_instances"
-
-# ----- TESTS FOR IMPORTING DYNAMIC ENV MAP ----- #
+MAP_INSTANCES_PATH = "instances/maps/custom_instances"
+INSTANCES_PATH = "instances/dynamic_instances/custom_instances"
 
 
-def test_import_dynamic_env_map_success():
-    file = "8-8-simple.txt"
-
-    expected_map = [
-        ["..@....."],
-        ["...@.a.."],
-        ["..@....."],
-        ["....cc..."],
-        [".......@"],
-        ["..b..@.."],
-        ["......@."],
-        ["........"],
-    ]
-    expected_dynamic_obstacles = {"a", "b", "cc"}
-
-    assert expected_map, expected_dynamic_obstacles == import_dynamic_env_map(
-        f"{MAP_INSTANCES_PATH}/{file}"
-    )
-
-
-@pytest.mark.parametrize(
-    "map, error_text",
-    [
-        (
-            """3 4\n@ . a .\nb @ . c .\n. d . .\n""",
-            "Expected row to have 4 columns, got 5",
-        ),
-        (
-            """3 4\n@ . a .\nb @ c\n. d . .\n""",
-            "Expected row to have 4 columns, got 3",
-        ),
-        (
-            """3 4\n@ . a .\nb @ c #\n. d . .\n""",
-            "Unknown dynamic env symbol #. Must be one of '@', '.' or is a letter(s) in the alphabet",
-        ),
-        (
-            """3 4\n@ . a .\nb @ c 7\n. d . .\n""",
-            "Unknown dynamic env symbol 7. Must be one of '@', '.' or is a letter(s) in the alphabet",
-        ),
-        (
-            """3 4\n@ . a .\nb @ c a\n. d . .\n""",
-            "Dynamic obstacle a can not be placed more than once on the map",
-        ),
-    ],
-    ids=[
-        "mismatch_columns_1",
-        "mismatch_columns_2",
-        "Unknown_dynamic_env_symbol",
-        "Unknown_dynamic_env_numerical_symbol",
-        "duplicate_dynamic_obstacle",
-    ],
-)
-def test_import_dynamic_env_map_fail(map: str, error_text: str):
-    with patch("builtins.open", mock_open(read_data=map)):
-        with patch.object(Path, "is_file", return_value=True):
-            with pytest.raises(BaseException, match=re.escape(error_text)):
-                import_dynamic_env_map("mock.txt")
-
-
-# ----- TESTS FOR IMPORTING DYNAMIC ENV INSTANCE ----- #
-
-
-def test_import_dynamic_env_instance_success():
-    file = "8-8-simple-deterministic-only.toml"
-    dynamic_obstacles = {"a", "b", "cc"}
-
-    expected_obstacle_data = {
-        "a": DeterministicMovement(
-            "a", 4, True, True, [M.DOWN, M.DOWN, M.DOWN]
-        ),
-        "b": DeterministicMovement(
-            "b",
-            0,
-            False,
-            False,
-            [
-                M.DOWN,
-                M.DOWN,
-                M.DOWN,
-                M.DOWN,
-                M.DOWN,
-                M.WAIT,
-                M.LEFT,
-                M.UP,
-                M.UP,
-                M.UP,
-                M.UP,
-                M.UP,
-            ],
-        ),
-        "cc": DeterministicMovement(
-            "cc",
-            2,
-            False,
-            True,
-            [
-                M.LEFT,
-                M.LEFT,
-                M.WAIT,
-                M.DOWN,
-                M.DOWN,
-                M.WAIT,
-                M.RIGHT,
-                M.RIGHT,
-                M.WAIT,
-                M.UP,
-                M.UP,
-            ],
-        ),
-    }
-
-    assert expected_obstacle_data == import_dynamic_env_instance(
-        f"{INSTANCES_PATH}/{file}", dynamic_obstacles
-    )
-
-
-def test_import_dynamic_env_instance_fail_missing_key():
+@pytest.fixture
+def mock_path() -> MagicMock:
     mock_path = MagicMock(spec=Path)
     mock_path.is_file.return_value = True
     mock_path.suffix = ".toml"
+    return mock_path
 
-    data = [
-        "[[dynamic_obstacle]]",
-        "id = 'a'",
-        "type = 'deterministic'",
-        "start_t = 4",
-        "hide_before_start = true",
-        "disappear_after_end = true",
-        "trajectory = ['D', 'D', 'D']",
-    ]
-    missing_keys = [
-        "id",
-        "type",
-        "start_t",
-        "hide_before_start",
-        "disappear_after_end",
-        "trajectory",
-    ]
 
-    for i in range(1, len(data)):
-        # build the dynamic obstacle data, but drop a key
-        missing_data = data[0:i] + data[i + 1 : len(data)]
-        missing_error = (
-            f"Missing key '{missing_keys[i - 1]}' in dynamic obstacle[0]"
+class TestImportDynamicEnvInstance:
+    def test_success(self):
+        file = "8-8-simple-1.toml"
+
+        a = DynamicObstacle("a")
+        b = DynamicObstacle("b")
+        c = DynamicObstacle("c")
+
+        a.add_trajectory(
+            Trajectory(
+                [Point(1, 1, 0, 1), Point(5, 1, 5, 0.5), Point(5, 3, 10, 0.1)]
+            )
+        )
+        a.add_trajectory(
+            Trajectory(
+                [Point(1, 1, 0, 1), Point(4, 1, 5, 0.5), Point(4, 3, 10, 0.1)]
+            )
         )
 
-        # mock the TOML file
-        file = io.BytesIO("\n".join(missing_data).encode("utf-8"))
+        b.add_trajectory(
+            Trajectory(
+                [Point(2, 5, 0, 1), Point(3, 5, 3, 0.7), Point(5, 3, 15, 0.2)]
+            )
+        )
+        b.add_trajectory(
+            Trajectory(
+                [Point(2, 5, 0, 1), Point(2, 5, 3, 0.6), Point(4, 3, 15, 0.9)]
+            )
+        )
+
+        c.add_trajectory(
+            Trajectory(
+                [Point(6, 6, 0, 1), Point(4, 5, 3, 0.3), Point(5, 3, 7, 0.1)]
+            )
+        )
+        c.add_trajectory(
+            Trajectory(
+                [Point(6, 6, 0, 1), Point(4, 1, 5, 0.5), Point(4, 3, 10, 0.9)]
+            )
+        )
+
+        expected_results = {"a": a, "b": b, "c": c}
+
+        assert expected_results == import_dynamic_env_instance(
+            f"{INSTANCES_PATH}/{file}"
+        )
+
+    def test_missing_id_or_start_point_key(self, mock_path):
+        data = "[[dynamic_obstacles]]"
+        id_str = "id='a'"
+        start_str = "start_point_ = {x = 1, y = 1}"
+
+        def mock_file(*args, **kwargs):
+            file.seek(0)
+            return file
+
+        id_err = "Missing key 'id' in dynamic obstacle[0]"
+        start_err = "Missing key 'start_point' in dynamic obstacle[0]"
+
+        with patch("cbs_sipp.map.dynamic_env.Path", return_value=mock_path):
+            # mock the TOML file
+            toml_data = "\n".join([data, start_str])
+            file = io.BytesIO(toml_data.encode("utf-8"))
+            with patch("builtins.open", mock_file):
+                with pytest.raises(KeyError, match=re.escape(id_err)):
+                    import_dynamic_env_instance("mock.toml")
+
+            toml_data = "\n".join([data, id_str])
+            file = io.BytesIO(toml_data.encode("utf-8"))
+            with patch("builtins.open", mock_file):
+                with pytest.raises(KeyError, match=re.escape(start_err)):
+                    import_dynamic_env_instance("mock.toml")
+
+    def test_duplicate_obstacle(self, mock_path):
+        data = """
+            [[dynamic_obstacles]]
+            id = "a"
+            start_point = {x = 1, y = 1}
+
+            [[dynamic_obstacles.trajectories]]
+            points = [
+                {x = 5, y = 3, t = 10, p = 0.1},
+            ]
+
+            [[dynamic_obstacles]]
+            id = "a"
+            start_point = {x = 2, y = 5}
+
+            [[dynamic_obstacles.trajectories]]
+            points = [
+                {x = 5, y = 3, t = 15, p = 0.2},
+            ]
+        """
 
         def mock_file(*args, **kwargs):
             file.seek(0)
             return file
 
         with patch("cbs_sipp.map.dynamic_env.Path", return_value=mock_path):
+            file = io.BytesIO(data.encode("utf-8"))
+            err = "Obstacle 'a' has already been defined in the dynamic environment instance"
             with patch("builtins.open", mock_file):
-                with pytest.raises(KeyError, match=re.escape(missing_error)):
-                    import_dynamic_env_instance("mock.toml", {"a"})
+                with pytest.raises(ValueError, match=re.escape(err)):
+                    import_dynamic_env_instance("mock.toml")
 
-
-def test_import_dynamic_env_instance_fail_wrong_types():
-    mock_path = MagicMock(spec=Path)
-    mock_path.is_file.return_value = True
-    mock_path.suffix = ".toml"
-
-    data = [
-        "[[dynamic_obstacle]]",
-        "id = 'a'",
-        "type = 'deterministic'",
-        "start_t = 4",
-        "hide_before_start = true",
-        "disappear_after_end = true",
-        "trajectory = ['D', 'D', 'D']",
-    ]
-    keys = [
-        "id",
-        "type",
-        "start_t",
-        "hide_before_start",
-        "disappear_after_end",
-        "trajectory",
-    ]
-    wrong_data_type = [
-        "id = 1",
-        "type = [1, 2, 4]",
-        "start_t = '4'",
-        "hide_before_start = 1",
-        "disappear_after_end = 0",
-        "trajectory = 'UP'",
-    ]
-    expected_types = [str, str, int, bool, bool, list]
-    actual_types = [int, list, str, int, int, str]
-
-    for i in range(1, len(data)):
-        # build the dynamic obstacle data, but with a incorrect data type
-        missing_data = (
-            data[0:i] + [wrong_data_type[i - 1]] + data[i + 1 : len(data)]
-        )
-        missing_error = f"'{keys[i - 1]}' is expected to be type {expected_types[i - 1]}; got type {actual_types[i - 1]}"
-
-        # mock the TOML file
-        file = io.BytesIO("\n".join(missing_data).encode("utf-8"))
+    @pytest.mark.parametrize(
+        "bad_point, err",
+        [
+            (
+                "start_point = {y = 1}",
+                "Missing key 'x' in dynamic obstacle[0]",
+            ),
+            (
+                "start_point = {x = 1}",
+                "Missing key 'y' in dynamic obstacle[0]",
+            ),
+            (
+                "start_point = {x = '1'}",
+                "'x' is expected to be type <class 'int'>; got type <class 'str'>",
+            ),
+            (
+                "start_point = {x = 1, y = false}",
+                "'y' is expected to be type <class 'int'>; got type <class 'bool'>",
+            ),
+        ],
+    )
+    def test_invalid_start_point(self, mock_path, bad_point, err):
+        data = """
+            [[dynamic_obstacles]]
+            id = "a"
+        """
 
         def mock_file(*args, **kwargs):
             file.seek(0)
             return file
 
         with patch("cbs_sipp.map.dynamic_env.Path", return_value=mock_path):
+            toml_data = "\n".join([data, bad_point])
+            file = io.BytesIO(toml_data.encode("utf-8"))
             with patch("builtins.open", mock_file):
-                with pytest.raises(TypeError, match=re.escape(missing_error)):
-                    import_dynamic_env_instance("mock.toml", {"a"})
+                with pytest.raises(
+                    (KeyError, TypeError), match=re.escape(err)
+                ):
+                    import_dynamic_env_instance("mock.toml")
 
+    @pytest.mark.parametrize(
+        "bad_point, err",
+        [
+            ("{y = 2}", "Missing key 'x' in dynamic obstacle[0]"),
+            ("{x = 2}", "Missing key 'y' in dynamic obstacle[0]"),
+            ("{x = 2, y = 2}", "Missing key 't' in dynamic obstacle[0]"),
+            (
+                "{x = 1, y = 2, t = 2}",
+                "Missing key 'p' in dynamic obstacle[0]",
+            ),
+            (
+                "{x = '2'}",
+                "'x' is expected to be type <class 'int'>; got type <class 'str'>",
+            ),
+            (
+                "{x = 2, y = false}",
+                "'y' is expected to be type <class 'int'>; got type <class 'bool'>",
+            ),
+            (
+                "{x = 2, y = 2, t = {}}",
+                "'t' is expected to be type <class 'int'>; got type <class 'dict'>",
+            ),
+            (
+                "{x = 2, y = 2, t = 2, p = []}",
+                "'p' is expected to be type <class 'float'>; got type <class 'list'>",
+            ),
+            ("{x = -1, y = 2, t = 2, p = 0.5}", "x position must be positive"),
+            ("{x = 2, y = -2, t = 2, p = 0.5}", "y position must be positive"),
+            ("{x = 2, y = 2, t = -1, p = 0.5}", "timestep t must be positive"),
+            (
+                "{x = 2, y = 2, t = 2, p = -0.00001}",
+                "Uncertainty value must be a float in the range [0, 1.0]",
+            ),
+            (
+                "{x = 2, y = 2, t = 2, p = 1.00001}",
+                "Uncertainty value must be a float in the range [0, 1.0]",
+            ),
+        ],
+    )
+    def test_bad_points(self, mock_path, bad_point, err):
+        data = Template("""
+            [[dynamic_obstacles]]
+            id = "a"
+            start_point = {x = 1, y = 1}
 
-@pytest.mark.parametrize(
-    "data, error_msg, obstacle_ids",
-    [
-        (
-            """
-            [[dynamic_obstacle]]
-            id = 'unknown'
-            type = 'deterministic'
-            start_t = 4
-            hide_before_start = true
-            disappear_after_end = true
-            trajectory = ['D', 'D', 'D']
-            """,
-            "Obstacle unknown does not exist in the given dynamic map environment",
-            {"a"},
-        ),
-        (
-            """
-            [[dynamic_obstacle]]
-            id = 'a'
-            type = 'unknown'
-            start_t = 4
-            hide_before_start = true
-            disappear_after_end = true
-            trajectory = ['D', 'D', 'D']
-            """,
-            "Unknown movement type 'unknown'",
-            {"a"},
-        ),
-        (
-            """
-            [[dynamic_obstacle]]
-            id = 'a'
-            type = 'deterministic'
-            start_t = 4
-            hide_before_start = true
-            disappear_after_end = true
-            trajectory = ['D', 'D', 'D']
-            """,
-            "Missing obstacle data for {'A'}",
-            {"a", "A"},
-        ),
-        (
-            """
-            [[dynamic_obstacle]]
-            id = 'a'
-            type = 'deterministic'
-            start_t = 4
-            hide_before_start = true
-            disappear_after_end = true
-            trajectory = ['D', 1, 'D']
-            """,
-            "Trajectory must only contain strings {'L', 'R', 'U', 'D', 'W'}; got 1",
-            {"a"},
-        ),
-        (
-            """
-            [[dynamic_obstacle]]
-            id = 'a'
-            type = 'deterministic'
-            start_t = 4
-            hide_before_start = true
-            disappear_after_end = true
-            trajectory = ['D', 'J', 'D']
-            """,
-            "Trajectory must only contain strings {'L', 'R', 'U', 'D', 'W'}; got J",
-            {"a"},
-        ),
-    ],
-    ids=[
-        "unknown_dynamic_obstacle_id",
-        "unknown_movement_type",
-        "missing_obstacle_data",
-        "invalid_trajectory_type",
-        "invalid_trajectory_value",
-    ],
-)
-def test_import_dynamic_env_instance_fail_general_errors(
-    data: str, error_msg: str, obstacle_ids: Set[str]
-):
-    mock_path = MagicMock(spec=Path)
-    mock_path.is_file.return_value = True
-    mock_path.suffix = ".toml"
+            [[dynamic_obstacles.trajectories]]
+            points = [$point]
+        """)
 
-    # mock the TOML file
-    file = io.BytesIO(data.encode("utf-8"))
+        def mock_file(*args, **kwargs):
+            file.seek(0)
+            return file
 
-    def mock_file(*args, **kwargs):
-        file.seek(0)
-        return file
-
-    with patch("cbs_sipp.map.dynamic_env.Path", return_value=mock_path):
-        with patch("builtins.open", mock_file):
-            with pytest.raises(
-                (ValueError, TypeError), match=re.escape(error_msg)
-            ):
-                import_dynamic_env_instance("mock.toml", obstacle_ids)
-
-
-# def test_import_dynamic_env_instance_fail_deterministic_movement():
+        with patch("cbs_sipp.map.dynamic_env.Path", return_value=mock_path):
+            toml_data = data.substitute(point=bad_point)
+            file = io.BytesIO(toml_data.encode("utf-8"))
+            with patch("builtins.open", mock_file):
+                with pytest.raises(
+                    (KeyError, TypeError, ValueError), match=re.escape(err)
+                ):
+                    import_dynamic_env_instance("mock.toml")
