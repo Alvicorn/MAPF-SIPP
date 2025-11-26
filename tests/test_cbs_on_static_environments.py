@@ -6,7 +6,7 @@ from typing import Dict
 import pytest
 
 from cbs_sipp.cbs.cbs import CBSSolver
-from cbs_sipp.map.static_map import StaticMap
+from cbs_sipp.map.grid_map import GridMap
 from cbs_sipp.path_utils import get_sum_of_cost
 
 INSTANCES_PATH = "instances/static/tests"
@@ -22,7 +22,7 @@ def test_static_environments(is_disjoint: bool):
 
     for file in sorted(glob.glob(f"{INSTANCES_PATH}/{INSTANCES}")):
         map, starts, goals = import_mapf_instance(file)
-        static_map = StaticMap(map)
+        static_map = GridMap(map)
 
         cbs = CBSSolver(static_map, starts, goals)
         paths = cbs.find_solution(is_disjoint)

@@ -10,7 +10,7 @@ DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
 
 
 @dataclass(frozen=True, slots=True, eq=False, repr=False, order=False)
-class StaticMap:
+class GridMap:
     map: List[List[bool]]
 
     def get_neighbours(self, curr_loc: Vertex) -> List[Vertex]:
