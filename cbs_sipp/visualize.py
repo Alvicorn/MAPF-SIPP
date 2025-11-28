@@ -1,14 +1,28 @@
 #!/usr/bin/env python3
+import random
+from typing import List
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation
 from matplotlib.patches import Circle, Rectangle
 
-Colors = ["green", "blue", "orange"]
+from cbs_sipp.map.dynamic_env import DynamicObstacle
+
+Colors = ["green", "blue", "orange", "pink", "khaki", "chartreuse", "fuchsia"]
+OBSTACLE_COLOUR = "lightgrey"
+COLLISION_COLOUR = "red"
 
 
 class Animation:
-    def __init__(self, my_map, starts, goals, paths):
+    def __init__(
+        self,
+        my_map,
+        starts,
+        goals,
+        paths,
+        dynamic_obstacles: List[DynamicObstacle] = [],
+    ):
         self.my_map = np.flip(np.transpose(my_map), 1)
         self.starts = []
         for start in starts:
@@ -25,6 +39,14 @@ class Animation:
                         (loc[1], len(self.my_map[0]) - 1 - loc[0])
                     )
 
+        self.obstacles = dynamic_obstacles
+        self.dynamic_obstacle_paths = dict()
+        for obs in self.obstacles:
+            p = []
+            for loc in random.choice(obs.possible_trajectory_paths):
+                p.append((loc[1], len(self.my_map[0]) - 1 - loc[0]))
+            self.dynamic_obstacle_paths[obs.id] = p
+
         aspect = len(self.my_map) / len(self.my_map[0])
 
         self.fig = plt.figure(frameon=False, figsize=(4 * aspect, 4))
@@ -38,8 +60,10 @@ class Animation:
         self.artists = []
         self.agents = dict()
         self.agent_names = dict()
-        # create boundary patch
+        self.dynamic_obstacles = dict()
+        self.dynamic_obstacle_names = dict()
 
+        # create boundary patch
         x_min = -0.5
         y_min = -0.5
         x_max = len(self.my_map) - 0.5
@@ -95,11 +119,38 @@ class Animation:
             self.patches.append(self.agents[i])
             self.T = max(self.T, len(paths[i]) - 1)
             self.agent_names[i] = self.ax.text(
-                starts[i][0], starts[i][1] + 0.25, name
+                starts[i][0],
+                starts[i][1] + 0.25,
+                name,
+                horizontalalignment="center",
+                verticalalignment="center",
             )
-            self.agent_names[i].set_horizontalalignment("center")
-            self.agent_names[i].set_verticalalignment("center")
             self.artists.append(self.agent_names[i])
+
+        # create dynamic obstacles
+        for obs in self.obstacles:
+            path = self.dynamic_obstacle_paths[obs.id]
+            start = path[0]
+            self.dynamic_obstacles[obs.id] = Rectangle(
+                (start[0] - 0.25, start[1] - 0.25),
+                0.5,
+                0.5,
+                facecolor=OBSTACLE_COLOUR,
+                edgecolor="black",
+                alpha=0.5,
+            )
+            self.dynamic_obstacles[
+                obs.id
+            ].original_face_color = OBSTACLE_COLOUR
+            self.patches.append(self.dynamic_obstacles[obs.id])
+            self.dynamic_obstacle_names[obs.id] = self.ax.text(
+                start[0],
+                start[1] + 0.25,
+                obs.id,
+                horizontalalignment="center",
+                verticalalignment="center",
+            )
+            self.artists.append(self.dynamic_obstacle_names[obs.id])
 
         self.animation = animation.FuncAnimation(
             self.fig,
@@ -135,9 +186,20 @@ class Animation:
             self.agents[k].center = (pos[0], pos[1])
             self.agent_names[k].set_position((pos[0], pos[1] + 0.5))
 
+        for obs in self.obstacles:
+            pos = self.get_state(t / 10, self.dynamic_obstacle_paths[obs.id])
+            self.dynamic_obstacles[obs.id].set_xy(
+                (pos[0] - 0.25, pos[1] - 0.25)
+            )
+            self.dynamic_obstacle_names[obs.id].set_position(
+                (pos[0], pos[1] + 0.5)
+            )
+
         # reset all colors
-        for _, agent in self.agents.items():
+        for agent in self.agents.values():
             agent.set_facecolor(agent.original_face_color)
+        for obs in self.dynamic_obstacles.values():
+            obs.set_facecolor(obs.original_face_color)
 
         # check drive-drive collisions
         agents_array = [agent for _, agent in self.agents.items()]
@@ -148,12 +210,33 @@ class Animation:
                 pos1 = np.array(d1.center)
                 pos2 = np.array(d2.center)
                 if np.linalg.norm(pos1 - pos2) < 0.7:
-                    d1.set_facecolor("red")
-                    d2.set_facecolor("red")
+                    d1.set_facecolor(COLLISION_COLOUR)
+                    d2.set_facecolor(COLLISION_COLOUR)
                     print(
-                        "COLLISION! (agent-agent) ({}, {}) at time {}".format(
-                            i, j, t / 10
-                        )
+                        f"COLLISION! (agent-agent) ({i}, {j}) at time {t / 10}"
+                    )
+
+        # check for agent-dynamic obstacle collisions
+        for i, agent in self.agents.items():
+            agent_pos = np.array(agent.center)
+            for obs in self.obstacles:
+                obs_rect = self.dynamic_obstacles[obs.id]
+                obs_pos = np.array(
+                    [  # center of the obstacle
+                        obs_rect.get_x() + 0.25,
+                        obs_rect.get_y() + 0.25,
+                    ]
+                )
+
+                if (
+                    np.linalg.norm(agent_pos - obs_pos) < 0.55
+                ):  # radius + half obstacle size
+                    agent.set_facecolor(COLLISION_COLOUR)
+                    self.dynamic_obstacles[obs.id].set_facecolor(
+                        COLLISION_COLOUR
+                    )
+                    print(
+                        f"COLLISION! (agent-obstacle) (agent {i}, obstacle {obs.id}) at time {t / 10}"
                     )
 
         return self.patches + self.artists
