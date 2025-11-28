@@ -36,7 +36,7 @@ start_point = {x = 2, y = 5}
 
 [[dynamic_obstacles]]
 id = "c"
-start_point = {x = 6, y = 6}
+start_point = {x = 4, y = 4}
 
   [[dynamic_obstacles.trajectories]]
   points = [

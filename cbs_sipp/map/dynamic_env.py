@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import random
 import tomllib
+from bisect import bisect_left
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
+
+from cbs_sipp.map.grid_map import GridMap
+from cbs_sipp.path_utils import Path as GridPath
+from cbs_sipp.path_utils import Vertex
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,13 +31,61 @@ class Point:
         if self.t < 0:
             raise ValueError("timestep t must be positive")
 
+    @property
+    def loc(self) -> Vertex:
+        return (self.x, self.y)
 
-@dataclass(slots=True)
+
+@dataclass(frozen=True, slots=True)
 class Trajectory:
-    points: List[Point]
+    points: Dict[int, Point] = field(init=False)
+    timestamps: List[int] = field(init=False)
+    min_t: int = field(init=False)
+    max_t: int = field(init=False)
+    sub_paths: Dict[Tuple[Point, Point], GridPath] = field(init=False)
 
-    def __post_init__(self):
-        self.points.sort(key=lambda p: p.t)
+    def __init__(self, points: List[Point], grid_map: GridMap):
+        object.__setattr__(self, "points", {p.t: p for p in points})
+        object.__setattr__(
+            self, "timestamps", sorted(list(self.points.keys()))
+        )
+        object.__setattr__(self, "min_t", self.timestamps[0])
+        object.__setattr__(self, "max_t", self.timestamps[-1])
+
+        # for every pair of timestamps, compute the shortest path
+        sub_paths = {}
+        for i in range(1, len(self.timestamps)):
+            t0, t1 = self.timestamps[i - 1], self.timestamps[i]
+            p0, p1 = self.points[t0], self.points[t1]
+            sub_paths[(p0, p1)], _ = grid_map.shortest_path(p0.loc, p1.loc)
+        object.__setattr__(self, "sub_paths", sub_paths)
+
+    def get_state_at_time(self, t: int) -> Vertex:
+        if t in self.points:
+            p = self.points[t]
+            return p.loc
+
+        if t <= self.min_t:
+            p = self.points[self.min_t]
+            return p.loc
+
+        if t >= self.max_t:
+            p = self.points[self.max_t]
+            return p.loc
+
+        t1_index = bisect_left(self.timestamps, t)
+
+        t0 = self.timestamps[t1_index - 1]
+        t1 = self.timestamps[t1_index]
+
+        p0 = self.points[t0]
+        p1 = self.points[t1]
+
+        path = self.sub_paths[(p0, p1)]
+
+        # select a random point on the this sub path
+        pos = random.randint(0, len(path) - 1)
+        return path[pos]
 
 
 @dataclass(slots=True)
@@ -42,14 +96,19 @@ class DynamicObstacle:
     def add_trajectory(self, trajectory: Trajectory) -> None:
         self.trajectories.append(trajectory)
 
+    def get_possible_states_at_time(self, t: int) -> List[Tuple[int, int]]:
+        return [traj.get_state_at_time(t) for traj in self.trajectories]
 
-def import_dynamic_env_instance(file: str) -> Dict[str, DynamicObstacle]:
+
+def import_dynamic_env_instance(
+    file: str, grid_map: GridMap
+) -> Dict[str, DynamicObstacle]:
     """
     Import the dynamic instance data from a TOML file.
 
     Args:
         file (str): TOML file with MAPF dynamic environment instance data.
-
+        grid_map (GridMap): Map of the static environment (e.g. barriers).
     Returns:
         Dict[str, DynamicObstacle]: Map between dynamic obstacle names and its data.
     """
@@ -80,6 +139,11 @@ def import_dynamic_env_instance(file: str) -> Dict[str, DynamicObstacle]:
         x_start = _get_obstacle_data_int(start_point, "x", i)
         y_start = _get_obstacle_data_int(start_point, "y", i)
 
+        if not grid_map.is_free((x_start, y_start)):
+            raise ValueError(
+                f"Initial start location for obstacle {id} is impeded by a static barrier"
+            )
+
         obstacle = DynamicObstacle(id)
 
         for trajectory in _get_obstacle_data_list(data, "trajectories", i):
@@ -87,11 +151,16 @@ def import_dynamic_env_instance(file: str) -> Dict[str, DynamicObstacle]:
             for point in _get_obstacle_data_list(trajectory, "points", i):
                 x = _get_obstacle_data_int(point, "x", i)
                 y = _get_obstacle_data_int(point, "y", i)
+                if not grid_map.is_free((x, y)):
+                    raise ValueError(
+                        f"Initial start location for obstacle {id} is impeded by a static barrier"
+                    )
+
                 t = _get_obstacle_data_int(point, "t", i)
                 p = _get_obstacle_data_float(point, "p", i)
                 points.append(Point(x, y, t, p))
 
-            obstacle.add_trajectory(Trajectory(points))
+            obstacle.add_trajectory(Trajectory(points, grid_map))
 
         obstacle_data[id] = obstacle
 

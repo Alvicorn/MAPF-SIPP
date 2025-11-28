@@ -1,8 +1,7 @@
 import io
 import re
-from pathlib import Path
 from string import Template
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -17,16 +16,8 @@ MAP_INSTANCES_PATH = "instances/maps/custom_instances"
 INSTANCES_PATH = "instances/dynamic_instances/custom_instances"
 
 
-@pytest.fixture
-def mock_path() -> MagicMock:
-    mock_path = MagicMock(spec=Path)
-    mock_path.is_file.return_value = True
-    mock_path.suffix = ".toml"
-    return mock_path
-
-
 class TestImportDynamicEnvInstance:
-    def test_success(self):
+    def test_success(self, grid_map):
         file = "8-8-simple-1.toml"
 
         a = DynamicObstacle("a")
@@ -35,44 +26,50 @@ class TestImportDynamicEnvInstance:
 
         a.add_trajectory(
             Trajectory(
-                [Point(1, 1, 0, 1), Point(5, 1, 5, 0.5), Point(5, 3, 10, 0.1)]
+                [Point(1, 1, 0, 1), Point(5, 1, 5, 0.5), Point(5, 3, 10, 0.1)],
+                grid_map,
             )
         )
         a.add_trajectory(
             Trajectory(
-                [Point(1, 1, 0, 1), Point(4, 1, 5, 0.5), Point(4, 3, 10, 0.1)]
+                [Point(1, 1, 0, 1), Point(4, 1, 5, 0.5), Point(4, 3, 10, 0.1)],
+                grid_map,
             )
         )
 
         b.add_trajectory(
             Trajectory(
-                [Point(2, 5, 0, 1), Point(3, 5, 3, 0.7), Point(5, 3, 15, 0.2)]
+                [Point(2, 5, 0, 1), Point(3, 5, 3, 0.7), Point(5, 3, 15, 0.2)],
+                grid_map,
             )
         )
         b.add_trajectory(
             Trajectory(
-                [Point(2, 5, 0, 1), Point(2, 5, 3, 0.6), Point(4, 3, 15, 0.9)]
+                [Point(2, 5, 0, 1), Point(2, 5, 3, 0.6), Point(4, 3, 15, 0.9)],
+                grid_map,
             )
         )
 
         c.add_trajectory(
             Trajectory(
-                [Point(6, 6, 0, 1), Point(4, 5, 3, 0.3), Point(5, 3, 7, 0.1)]
+                [Point(4, 4, 0, 1), Point(4, 5, 3, 0.3), Point(5, 3, 7, 0.1)],
+                grid_map,
             )
         )
         c.add_trajectory(
             Trajectory(
-                [Point(6, 6, 0, 1), Point(4, 1, 5, 0.5), Point(4, 3, 10, 0.9)]
+                [Point(4, 4, 0, 1), Point(4, 1, 5, 0.5), Point(4, 3, 10, 0.9)],
+                grid_map,
             )
         )
 
         expected_results = {"a": a, "b": b, "c": c}
 
         assert expected_results == import_dynamic_env_instance(
-            f"{INSTANCES_PATH}/{file}"
+            f"{INSTANCES_PATH}/{file}", grid_map
         )
 
-    def test_missing_id_or_start_point_key(self, mock_path):
+    def test_missing_id_or_start_point_key(self, mock_path, grid_map):
         data = "[[dynamic_obstacles]]"
         id_str = "id='a'"
         start_str = "start_point_ = {x = 1, y = 1}"
@@ -90,15 +87,15 @@ class TestImportDynamicEnvInstance:
             file = io.BytesIO(toml_data.encode("utf-8"))
             with patch("builtins.open", mock_file):
                 with pytest.raises(KeyError, match=re.escape(id_err)):
-                    import_dynamic_env_instance("mock.toml")
+                    import_dynamic_env_instance("mock.toml", grid_map)
 
             toml_data = "\n".join([data, id_str])
             file = io.BytesIO(toml_data.encode("utf-8"))
             with patch("builtins.open", mock_file):
                 with pytest.raises(KeyError, match=re.escape(start_err)):
-                    import_dynamic_env_instance("mock.toml")
+                    import_dynamic_env_instance("mock.toml", grid_map)
 
-    def test_duplicate_obstacle(self, mock_path):
+    def test_duplicate_obstacle(self, mock_path, grid_map):
         data = """
             [[dynamic_obstacles]]
             id = "a"
@@ -128,7 +125,7 @@ class TestImportDynamicEnvInstance:
             err = "Obstacle 'a' has already been defined in the dynamic environment instance"
             with patch("builtins.open", mock_file):
                 with pytest.raises(ValueError, match=re.escape(err)):
-                    import_dynamic_env_instance("mock.toml")
+                    import_dynamic_env_instance("mock.toml", grid_map)
 
     @pytest.mark.parametrize(
         "bad_point, err",
@@ -149,9 +146,13 @@ class TestImportDynamicEnvInstance:
                 "start_point = {x = 1, y = false}",
                 "'y' is expected to be type <class 'int'>; got type <class 'bool'>",
             ),
+            (
+                "start_point = {x = 0, y = 2}",
+                "Initial start location for obstacle a is impeded by a static barrier",
+            ),
         ],
     )
-    def test_invalid_start_point(self, mock_path, bad_point, err):
+    def test_invalid_start_point(self, mock_path, grid_map, bad_point, err):
         data = """
             [[dynamic_obstacles]]
             id = "a"
@@ -166,50 +167,60 @@ class TestImportDynamicEnvInstance:
             file = io.BytesIO(toml_data.encode("utf-8"))
             with patch("builtins.open", mock_file):
                 with pytest.raises(
-                    (KeyError, TypeError), match=re.escape(err)
+                    (KeyError, TypeError, ValueError), match=re.escape(err)
                 ):
-                    import_dynamic_env_instance("mock.toml")
+                    import_dynamic_env_instance("mock.toml", grid_map)
 
     @pytest.mark.parametrize(
         "bad_point, err",
         [
-            ("{y = 2}", "Missing key 'x' in dynamic obstacle[0]"),
-            ("{x = 2}", "Missing key 'y' in dynamic obstacle[0]"),
-            ("{x = 2, y = 2}", "Missing key 't' in dynamic obstacle[0]"),
+            ("{y = 4}", "Missing key 'x' in dynamic obstacle[0]"),
+            ("{x = 4}", "Missing key 'y' in dynamic obstacle[0]"),
+            ("{x = 4, y = 4}", "Missing key 't' in dynamic obstacle[0]"),
             (
-                "{x = 1, y = 2, t = 2}",
+                "{x = 4, y = 4, t = 4}",
                 "Missing key 'p' in dynamic obstacle[0]",
             ),
             (
-                "{x = '2'}",
+                "{x = '4'}",
                 "'x' is expected to be type <class 'int'>; got type <class 'str'>",
             ),
             (
-                "{x = 2, y = false}",
+                "{x = 4, y = false}",
                 "'y' is expected to be type <class 'int'>; got type <class 'bool'>",
             ),
             (
-                "{x = 2, y = 2, t = {}}",
+                "{x = 4, y = 4, t = {}}",
                 "'t' is expected to be type <class 'int'>; got type <class 'dict'>",
             ),
             (
-                "{x = 2, y = 2, t = 2, p = []}",
+                "{x = 4, y = 4, t = 4, p = []}",
                 "'p' is expected to be type <class 'float'>; got type <class 'list'>",
             ),
-            ("{x = -1, y = 2, t = 2, p = 0.5}", "x position must be positive"),
-            ("{x = 2, y = -2, t = 2, p = 0.5}", "y position must be positive"),
-            ("{x = 2, y = 2, t = -1, p = 0.5}", "timestep t must be positive"),
             (
-                "{x = 2, y = 2, t = 2, p = -0.00001}",
+                "{x = -1, y = 4, t = 4, p = 0.5}",
+                "Initial start location for obstacle a is impeded by a static barrier",
+            ),
+            (
+                "{x = 4, y = -1, t = 4, p = 0.5}",
+                "Initial start location for obstacle a is impeded by a static barrier",
+            ),
+            ("{x = 4, y = 4, t = -1, p = 0.5}", "timestep t must be positive"),
+            (
+                "{x = 4, y = 4, t = 4, p = -0.00001}",
                 "Uncertainty value must be a float in the range [0, 1.0]",
             ),
             (
-                "{x = 2, y = 2, t = 2, p = 1.00001}",
+                "{x = 4, y = 4, t = 4, p = 1.00001}",
                 "Uncertainty value must be a float in the range [0, 1.0]",
+            ),
+            (
+                "{x = 0, y = 2, t = 5, p = 0.5}",
+                "Initial start location for obstacle a is impeded by a static barrier",
             ),
         ],
     )
-    def test_bad_points(self, mock_path, bad_point, err):
+    def test_bad_points(self, mock_path, grid_map, bad_point, err):
         data = Template("""
             [[dynamic_obstacles]]
             id = "a"
@@ -230,4 +241,27 @@ class TestImportDynamicEnvInstance:
                 with pytest.raises(
                     (KeyError, TypeError, ValueError), match=re.escape(err)
                 ):
-                    import_dynamic_env_instance("mock.toml")
+                    import_dynamic_env_instance("mock.toml", grid_map)
+
+
+class TestDynamicObstacle:
+    def test_get_possible_states_at_time(self, grid_map):
+        a = DynamicObstacle("a")
+        start = Point(1, 1, 0, 1)
+        a.add_trajectory(
+            Trajectory(
+                [start, Point(5, 1, 5, 0.5), Point(7, 7, 10, 0.1)], grid_map
+            )
+        )
+        a.add_trajectory(
+            Trajectory(
+                [start, Point(4, 3, 5, 0.5), Point(4, 3, 10, 0.1)], grid_map
+            )
+        )
+
+        assert [(1, 1), (1, 1)] == a.get_possible_states_at_time(-1)
+        assert [(1, 1), (1, 1)] == a.get_possible_states_at_time(0)
+        assert [(5, 1), (4, 3)] == a.get_possible_states_at_time(5)
+        assert [(7, 7), (4, 3)] == a.get_possible_states_at_time(10)
+        assert [(7, 7), (4, 3)] == a.get_possible_states_at_time(11)
+        assert [(5, 2), (4, 3)] == a.get_possible_states_at_time(7)
