@@ -7,7 +7,7 @@ from typing import Any, Collection, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from cbs_sipp.cbs.constraint import Collision, CollisionType, Constraint
 from cbs_sipp.cbs.single_agent_planner import a_star
-from cbs_sipp.map.static_map import StaticMap
+from cbs_sipp.map.grid_map import GridMap
 from cbs_sipp.path_utils import Path, Vertex, get_location, get_sum_of_cost
 
 
@@ -191,7 +191,7 @@ class CBSSolver(object):
     """The high-level search of CBS."""
 
     def __init__(
-        self, grid_map: StaticMap, starts: List[Vertex], goals: List[Vertex]
+        self, grid_map: GridMap, starts: List[Vertex], goals: List[Vertex]
     ):
         """my_map   - list of lists specifying obstacle positions
         starts      - [(x1, y1), (x2, y2), ...] list of start locations
