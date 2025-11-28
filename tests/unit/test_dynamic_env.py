@@ -265,3 +265,38 @@ class TestDynamicObstacle:
         assert [(7, 7), (4, 3)] == a.get_possible_states_at_time(10)
         assert [(7, 7), (4, 3)] == a.get_possible_states_at_time(11)
         assert [(5, 2), (4, 3)] == a.get_possible_states_at_time(7)
+
+    def test_trajectory_paths(self, grid_map):
+        a = DynamicObstacle("a")
+        start = Point(1, 1, 0, 1)
+        a.add_trajectory(
+            Trajectory(
+                [start, Point(5, 1, 5, 0.5), Point(7, 7, 10, 0.1)], grid_map
+            )
+        )
+        a.add_trajectory(
+            Trajectory(
+                [start, Point(4, 3, 5, 0.5), Point(4, 3, 10, 0.1)], grid_map
+            )
+        )
+
+        expected_result = [
+            [
+                (1, 1),
+                (2, 1),
+                (3, 1),
+                (4, 1),
+                (5, 1),
+                (5, 2),
+                (5, 3),
+                (5, 4),
+                (6, 4),
+                (6, 5),
+                (7, 5),
+                (7, 6),
+                (7, 7),
+            ],
+            [(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (4, 3)],
+        ]
+
+        assert expected_result == a.possible_trajectory_paths

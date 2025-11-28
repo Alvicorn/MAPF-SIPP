@@ -44,6 +44,8 @@ class Trajectory:
     max_t: int = field(init=False)
     sub_paths: Dict[Tuple[Point, Point], GridPath] = field(init=False)
 
+    path: GridPath = field(init=False)
+
     def __init__(self, points: List[Point], grid_map: GridMap):
         object.__setattr__(self, "points", {p.t: p for p in points})
         object.__setattr__(
@@ -54,11 +56,23 @@ class Trajectory:
 
         # for every pair of timestamps, compute the shortest path
         sub_paths = {}
+        path = []
+
         for i in range(1, len(self.timestamps)):
             t0, t1 = self.timestamps[i - 1], self.timestamps[i]
             p0, p1 = self.points[t0], self.points[t1]
-            sub_paths[(p0, p1)], _ = grid_map.shortest_path(p0.loc, p1.loc)
+            sub_path, _ = grid_map.shortest_path(p0.loc, p1.loc)
+            sub_paths[(p0, p1)] = sub_path
+
+            if i == 1:
+                path = sub_path
+            else:
+                if path[-1] != sub_path[0]:  # sanity check
+                    raise ValueError("Sub-paths do not align")
+                path += sub_path[1:]
+
         object.__setattr__(self, "sub_paths", sub_paths)
+        object.__setattr__(self, "path", path)
 
     def get_state_at_time(self, t: int) -> Vertex:
         if t in self.points:
@@ -95,6 +109,10 @@ class DynamicObstacle:
 
     def add_trajectory(self, trajectory: Trajectory) -> None:
         self.trajectories.append(trajectory)
+
+    @property
+    def possible_trajectory_paths(self) -> List[GridPath]:
+        return [traj.path for traj in self.trajectories]
 
     def get_possible_states_at_time(self, t: int) -> List[Tuple[int, int]]:
         return [traj.get_state_at_time(t) for traj in self.trajectories]
