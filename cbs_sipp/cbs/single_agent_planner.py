@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
 from cbs_sipp.cbs.constraint import Constraint, ConstraintTable
-from cbs_sipp.map.grid_map import GridMap
+from cbs_sipp.map.static_map import StaticMap
 from cbs_sipp.path_utils import Path, Vertex
 
 
@@ -55,7 +55,7 @@ def pop_node(open_list: List) -> AStarNode:
 
 
 def generate_children(
-    grid_map: GridMap,
+    grid_map: StaticMap,
     h_values: Dict[Vertex, int],
     curr: AStarNode,
     constraint_table: ConstraintTable,
@@ -140,7 +140,7 @@ def solution_found(
 
 
 def a_star(
-    grid_map: GridMap,
+    grid_map: StaticMap,
     start_loc: Vertex,
     goal_loc: Vertex,
     h_values: Dict[Vertex, int],

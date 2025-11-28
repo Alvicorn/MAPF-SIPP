@@ -21,9 +21,7 @@ RUN pip install --no-cache-dir --break-system-packages \
           pre-commit \
           numpy \
           matplotlib \
-          pytest \
-          pytest-cov \
-          pytest-xdist
+          pytest
 
 # Verify Python version
 RUN python3 --version
