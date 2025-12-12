@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir --break-system-packages \
           pre-commit \
           numpy \
           matplotlib \
+          toml \
           pytest \
           pytest-cov \
           pytest-xdist
