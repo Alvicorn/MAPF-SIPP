@@ -174,6 +174,7 @@ if __name__ == "__main__":
             for i, path in enumerate(paths):
                 print(f"Agent {i}: {path}")
             print("***Test paths on a simulation***")
+
             animation = Animation(my_map, starts, goals, paths)
             animation.save("output.mp4", 1.0)
             animation.show()

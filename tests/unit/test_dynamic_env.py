@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from cbs_sipp.map.dynamic_env import (
+    Agent,
     DynamicObstacle,
     Point,
     Trajectory,
@@ -18,7 +19,11 @@ INSTANCES_PATH = "instances/dynamic_instances/custom_instances"
 
 class TestImportDynamicEnvInstance:
     def test_success(self, grid_map):
-        file = "8-8-simple-1.toml"
+        file = "simple-8-8-1.toml"
+
+        a0 = Agent(0, (2, 1), (7, 3))
+        a1 = Agent(1, (6, 2), (2, 1))
+        a2 = Agent(2, (7, 3), (5, 6))
 
         a = DynamicObstacle("a")
         b = DynamicObstacle("b")
@@ -63,14 +68,14 @@ class TestImportDynamicEnvInstance:
             )
         )
 
-        expected_results = {"a": a, "b": b, "c": c}
+        expected_results = ({0: a0, 1: a1, 2: a2}, {"a": a, "b": b, "c": c})
 
         assert expected_results == import_dynamic_env_instance(
             f"{INSTANCES_PATH}/{file}", grid_map
         )
 
     def test_missing_id_or_start_point_key(self, mock_path, grid_map):
-        data = "[[dynamic_obstacles]]"
+        data = "[[agents]]\nid = 0\n start_point = {x = 2, y = 1}\ngoal_point = {x = 7, y = 3}\n[[dynamic_obstacles]]"
         id_str = "id='a'"
         start_str = "start_point_ = {x = 1, y = 1}"
 
@@ -97,6 +102,11 @@ class TestImportDynamicEnvInstance:
 
     def test_duplicate_obstacle(self, mock_path, grid_map):
         data = """
+            [[agents]]
+            id = 0
+            start_point = {x = 2, y = 1}
+            goal_point = {x = 7, y = 3}
+
             [[dynamic_obstacles]]
             id = "a"
             start_point = {x = 1, y = 1}
@@ -148,12 +158,18 @@ class TestImportDynamicEnvInstance:
             ),
             (
                 "start_point = {x = 0, y = 2}",
-                "Initial start location for obstacle a is impeded by a static barrier",
+                "start_point for obstacle 'a' is impeded by a static barrier",
             ),
         ],
     )
     def test_invalid_start_point(self, mock_path, grid_map, bad_point, err):
         data = """
+            [[agents]]
+            id = 0
+            start_point = {x = 2, y = 1}
+            goal_point = {x = 7, y = 3}
+
+
             [[dynamic_obstacles]]
             id = "a"
         """
@@ -222,6 +238,11 @@ class TestImportDynamicEnvInstance:
     )
     def test_bad_points(self, mock_path, grid_map, bad_point, err):
         data = Template("""
+            [[agents]]
+            id = 0
+            start_point = {x = 2, y = 1}
+            goal_point = {x = 7, y = 3}
+
             [[dynamic_obstacles]]
             id = "a"
             start_point = {x = 1, y = 1}
@@ -265,3 +286,38 @@ class TestDynamicObstacle:
         assert [(7, 7), (4, 3)] == a.get_possible_states_at_time(10)
         assert [(7, 7), (4, 3)] == a.get_possible_states_at_time(11)
         assert [(5, 2), (4, 3)] == a.get_possible_states_at_time(7)
+
+    def test_trajectory_paths(self, grid_map):
+        a = DynamicObstacle("a")
+        start = Point(1, 1, 0, 1)
+        a.add_trajectory(
+            Trajectory(
+                [start, Point(5, 1, 5, 0.5), Point(7, 7, 10, 0.1)], grid_map
+            )
+        )
+        a.add_trajectory(
+            Trajectory(
+                [start, Point(4, 3, 5, 0.5), Point(4, 3, 10, 0.1)], grid_map
+            )
+        )
+
+        expected_result = [
+            [
+                (1, 1),
+                (2, 1),
+                (3, 1),
+                (4, 1),
+                (5, 1),
+                (5, 2),
+                (5, 3),
+                (5, 4),
+                (6, 4),
+                (6, 5),
+                (7, 5),
+                (7, 6),
+                (7, 7),
+            ],
+            [(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (4, 3)],
+        ]
+
+        assert expected_result == a.possible_trajectory_paths

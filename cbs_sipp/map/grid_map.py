@@ -73,8 +73,14 @@ class GridMap:
 
         return closed_list
 
-    @lru_cache(maxsize=None)
     def shortest_path(self, start: Vertex, goal: Vertex) -> Tuple[Path, int]:
+        path, cost = self._shortest_path(start, goal)
+        return list(path), cost
+
+    @lru_cache(maxsize=None)
+    def _shortest_path(
+        self, start: Vertex, goal: Vertex
+    ) -> Tuple[Tuple[Vertex], int]:
         """
         Find the shortest path from start to goal.
 
@@ -113,7 +119,7 @@ class GridMap:
                     path.append(pos)
                     curr = parent
                 path.reverse()
-                return path, cost
+                return tuple(path), cost
 
             if closed_list[loc] < cost:
                 continue
