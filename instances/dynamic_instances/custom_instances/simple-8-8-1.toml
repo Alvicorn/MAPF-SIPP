@@ -1,0 +1,66 @@
+[[agents]]
+id = 0
+start_point = {x = 2, y = 1}
+goal_point = {x = 7, y = 3}
+
+
+[[agents]]
+id = 1
+start_point = {x = 6, y = 2}
+goal_point = {x = 2, y = 1}
+
+
+[[agents]]
+id = 2
+start_point = {x = 7, y = 3}
+goal_point = {x = 5, y = 6}
+
+
+[[dynamic_obstacles]]
+id = "a"
+start_point = {x = 1, y = 1}
+
+  [[dynamic_obstacles.trajectories]]
+  points = [
+    {x = 5, y = 1, t = 5, p = 0.5},
+    {x = 5, y = 3, t = 10, p = 0.1},
+  ]
+
+  [[dynamic_obstacles.trajectories]]
+  points = [
+    {x = 4, y = 1, t = 5, p = 0.5},
+    {x = 4, y = 3, t = 10, p = 0.1},
+  ]
+
+
+[[dynamic_obstacles]]
+id = "b"
+start_point = {x = 2, y = 5}
+
+  [[dynamic_obstacles.trajectories]]
+  points = [
+    {x = 3, y = 5, t = 3, p = 0.7},
+    {x = 5, y = 3, t = 15, p = 0.2},
+  ]
+
+  [[dynamic_obstacles.trajectories]]
+  points = [
+    {x = 2, y = 5, t = 3, p = 0.6},
+    {x = 4, y = 3, t = 15, p = 0.9},
+  ]
+
+[[dynamic_obstacles]]
+id = "c"
+start_point = {x = 4, y = 4}
+
+  [[dynamic_obstacles.trajectories]]
+  points = [
+    {x = 4, y = 5, t = 3, p = 0.3},
+    {x = 5, y = 3, t = 7, p = 0.1},
+  ]
+
+  [[dynamic_obstacles.trajectories]]
+  points = [
+    {x = 4, y = 1, t = 5, p = 0.5},
+    {x = 4, y = 3, t = 10, p = 0.9},
+  ]

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict
 
 from cbs_sipp.cbs.cbs import CBSSolver
-from cbs_sipp.map.static_map import StaticMap
+from cbs_sipp.map.grid_map import GridMap
 from cbs_sipp.path_utils import get_sum_of_cost
 from cbs_sipp.visualize import Animation
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
             print(f"\nTesting {file}")
             total_tests += 1
 
-        grid_map = StaticMap(my_map)
+        grid_map = GridMap(my_map)
         cbs = CBSSolver(grid_map, starts, goals)
         paths = cbs.find_solution(args.disjoint)
 
@@ -174,6 +174,7 @@ if __name__ == "__main__":
             for i, path in enumerate(paths):
                 print(f"Agent {i}: {path}")
             print("***Test paths on a simulation***")
+
             animation = Animation(my_map, starts, goals, paths)
             animation.save("output.mp4", 1.0)
             animation.show()
