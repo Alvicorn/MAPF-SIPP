@@ -175,60 +175,7 @@ if __name__ == "__main__":
                 print(f"Agent {i}: {path}")
             print("***Test paths on a simulation***")
 
-            from cbs_sipp.map.dynamic_env import (
-                DynamicObstacle,
-                Point,
-                Trajectory,
-            )
-
-            a = DynamicObstacle("a")
-            b = DynamicObstacle("b")
-
-            a.add_trajectory(
-                Trajectory(
-                    [
-                        Point(2, 2, 0, 1),
-                        Point(5, 1, 5, 0.5),
-                        Point(4, 4, 10, 0.1),
-                    ],
-                    grid_map,
-                )
-            )
-            a.add_trajectory(
-                Trajectory(
-                    [
-                        Point(2, 2, 0, 1),
-                        Point(4, 1, 5, 0.5),
-                        Point(4, 3, 10, 0.1),
-                    ],
-                    grid_map,
-                )
-            )
-
-            b.add_trajectory(
-                Trajectory(
-                    [
-                        Point(2, 4, 0, 1),
-                        Point(3, 5, 3, 0.7),
-                        Point(5, 3, 15, 0.2),
-                    ],
-                    grid_map,
-                )
-            )
-            b.add_trajectory(
-                Trajectory(
-                    [
-                        Point(2, 4, 0, 1),
-                        Point(0, 1, 3, 0.6),
-                        Point(6, 6, 13, 0.9),
-                    ],
-                    grid_map,
-                )
-            )
-
-            animation = Animation(
-                my_map, starts, goals, paths, dynamic_obstacles=[a, b]
-            )
+            animation = Animation(my_map, starts, goals, paths)
             animation.save("output.mp4", 1.0)
             animation.show()
 

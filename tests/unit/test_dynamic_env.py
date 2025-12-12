@@ -19,7 +19,7 @@ INSTANCES_PATH = "instances/dynamic_instances/custom_instances"
 
 class TestImportDynamicEnvInstance:
     def test_success(self, grid_map):
-        file = "8-8-simple-1.toml"
+        file = "simple-8-8-1.toml"
 
         a0 = Agent(0, (2, 1), (7, 3))
         a1 = Agent(1, (6, 2), (2, 1))
