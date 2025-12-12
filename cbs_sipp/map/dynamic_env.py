@@ -13,6 +13,13 @@ from cbs_sipp.path_utils import Vertex
 
 
 @dataclass(frozen=True, slots=True)
+class Agent:
+    id: int
+    start: Vertex
+    goal: Vertex
+
+
+@dataclass(frozen=True, slots=True)
 class Point:
     x: int
     y: int
@@ -120,7 +127,7 @@ class DynamicObstacle:
 
 def import_dynamic_env_instance(
     file: str, grid_map: GridMap
-) -> Dict[str, DynamicObstacle]:
+) -> Tuple[Dict[int, Agent], Dict[str, DynamicObstacle]]:
     """
     Import the dynamic instance data from a TOML file.
 
@@ -128,7 +135,7 @@ def import_dynamic_env_instance(
         file (str): TOML file with MAPF dynamic environment instance data.
         grid_map (GridMap): Map of the static environment (e.g. barriers).
     Returns:
-        Dict[str, DynamicObstacle]: Map between dynamic obstacle names and its data.
+        Tuple[Dict[int, Agent], Dict[str, DynamicObstacle]]: Parsed Agent and Dynamic obstacle objects.
     """
     f = Path(file)
     if not f.is_file():
@@ -138,33 +145,80 @@ def import_dynamic_env_instance(
             "The dynamic environment instance file must be a .toml file"
         )
 
-    obstacle_data = {}
-
     with open(file, "rb") as f:
         instance_data = tomllib.load(f)
 
-    # TODO: load agents
+    if "agents" not in instance_data:
+        raise KeyError(f"Missing key 'agents' in {f}")
+    if "dynamic_obstacles" not in instance_data:
+        raise KeyError(f"Missing key 'dynamic_obstacles' in {f}")
 
-    # load the obstacles
-    for i, data in enumerate(instance_data["dynamic_obstacles"]):
-        id = _get_obstacle_data_str(data, "id", i)
-        if id in obstacle_data:
+    return _import_agent_data(
+        instance_data["agents"], grid_map
+    ), _import_obstacle_data(instance_data["dynamic_obstacles"], grid_map)
+
+
+def _import_agent_data(
+    data: List[Dict[str, Any]], grid_map: GridMap
+) -> Dict[int, Agent]:
+    """
+    Parse data into Agent objects.
+
+    Args:
+        data (List[Dict[str, Any]]): Imported agent data about the MAPF instance.
+        grid_map (GridMap): Map of the MAPF instance.
+
+    Returns:
+        Dict[int, Agent]: Map of agent ids and agent data.
+    """
+    agents = {}
+    for i, agent_data in enumerate(data):
+        id = _get_obstacle_data_int(agent_data, "id", i)
+        if id in agents:
+            raise ValueError(
+                f"Agent '{id}' has already been defined in the dynamic environment instance"
+            )
+
+        start_point = _get_point_data(
+            grid_map, agent_data, "start_point", i, id
+        )
+        goal_point = _get_point_data(grid_map, agent_data, "goal_point", i, id)
+
+        agents[id] = Agent(id, start_point, goal_point)
+
+    return agents
+
+
+def _import_obstacle_data(
+    data: List[Dict[str, Any]], grid_map: GridMap
+) -> Dict[str, DynamicObstacle]:
+    """
+    Parse data into Obstacle objects.
+
+    Args:
+        data (List[Dict[str, Any]]): Imported obstacle data about the MAPF instance.
+        grid_map (GridMap): Map of the MAPF instance.
+
+    Returns:
+        Dict[str, Agent]: Map of obstacle ids and obstacle data.
+    """
+    obstacles = {}
+    for i, obstacle_data in enumerate(data):
+        id = _get_obstacle_data_str(obstacle_data, "id", i)
+        if id in obstacles:
             raise ValueError(
                 f"Obstacle '{id}' has already been defined in the dynamic environment instance"
             )
 
-        start_point = _get_obstacle_data_dict(data, "start_point", i)
-        x_start = _get_obstacle_data_int(start_point, "x", i)
-        y_start = _get_obstacle_data_int(start_point, "y", i)
-
-        if not grid_map.is_free((x_start, y_start)):
-            raise ValueError(
-                f"Initial start location for obstacle {id} is impeded by a static barrier"
-            )
+        x_start, y_start = _get_point_data(
+            grid_map, obstacle_data, "start_point", i, id, is_agent=False
+        )
 
         obstacle = DynamicObstacle(id)
 
-        for trajectory in _get_obstacle_data_list(data, "trajectories", i):
+        for trajectory in _get_obstacle_data_list(
+            obstacle_data, "trajectories", i
+        ):
             points = [Point(x_start, y_start, 0, 1)]
             for point in _get_obstacle_data_list(trajectory, "points", i):
                 x = _get_obstacle_data_int(point, "x", i)
@@ -180,12 +234,45 @@ def import_dynamic_env_instance(
 
             obstacle.add_trajectory(Trajectory(points, grid_map))
 
-        obstacle_data[id] = obstacle
+        obstacles[id] = obstacle
 
-    return obstacle_data
+    return obstacles
 
 
-# ----- HELPER FUNCTIONS FOR LOADING OBSTACLE DATA  ----- #
+# ----- HELPER FUNCTIONS FOR LOADING TOML DATA  ----- #
+
+
+def _get_point_data(
+    grid_map: GridMap,
+    data: Dict[str, Any],
+    point_name: str,
+    index: int,
+    id: int | str,
+    is_agent: bool = True,
+) -> Vertex:
+    """
+    Extract point information and validate it.
+
+    Args:
+        grid_map (GridMap): Map of the MAPF instance
+        data (Dict[str, Any]): MAPF instance data.
+        point_name (str): Name of the point in the data dictionary.
+        index (int): Index of the target point.
+        id (int | str): ID of the object that is trying to parse to point.
+        is_obstacle (bool): Object that is trying to parse the point is an agent. Defaults to True.
+
+    Returns:
+        Vertex: Parsed point as a Vertex object.
+    """
+    point = _get_obstacle_data_dict(data, point_name, index)
+    x = _get_obstacle_data_int(point, "x", index)
+    y = _get_obstacle_data_int(point, "y", index)
+    if not grid_map.is_free((x, y)):
+        dynamic_object = "agent" if is_agent else "obstacle"
+        raise ValueError(
+            f"{point_name} for {dynamic_object} '{id}' is impeded by a static barrier"
+        )
+    return (x, y)
 
 
 def _get_obstacle_data_str(data: Dict[str, Any], key: str, index: int) -> str:

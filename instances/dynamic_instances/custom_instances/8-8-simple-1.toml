@@ -1,4 +1,19 @@
+[[agents]]
+id = 0
+start_point = {x = 2, y = 1}
+goal_point = {x = 7, y = 3}
 
+
+[[agents]]
+id = 1
+start_point = {x = 6, y = 2}
+goal_point = {x = 2, y = 1}
+
+
+[[agents]]
+id = 2
+start_point = {x = 7, y = 3}
+goal_point = {x = 5, y = 6}
 
 
 [[dynamic_obstacles]]
